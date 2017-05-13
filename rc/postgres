@@ -1,0 +1,59 @@
+#!/bin/sh
+set -x
+exec >>/pg.log 2>&1
+date
+
+LANG=en_US.utf8
+PGDATA=/srv/postgres/data
+PATH=/bin:/sbin:/usr/bin:/usr/sbin
+export LANG PGDATA PATH
+
+mkdir -p "$PGDATA"
+chown -R postgres "$PGDATA"
+chmod 0700 "$PGDATA"
+
+if [[ -z "$(ls -1 "$PGDATA")" ]]; then
+    su postgres -s /bin/sh -c 'initdb'
+
+    : ${POSTGRES_USER:="postgres"}
+    : ${POSTGRES_DB:=$POSTGRES_USER}
+
+    if [[ -n "$POSTGRES_PASSWORD" ]]; then
+      pass="PASSWORD '$POSTGRES_PASSWORD'"
+      auth_method=md5
+    else
+      echo "==============================="
+      echo "!!! Use \$POSTGRES_PASSWORD env var to secure your database !!!"
+      echo "==============================="
+      pass=
+      auth_method=trust
+    fi
+    echo
+
+
+    if [[ "$POSTGRES_DB" != 'postgres' ]]; then
+      echo "CREATE DATABASE $POSTGRES_DB;" | su postgres -s /bin/sh -c 'postgres --single -jE'
+      echo
+    fi
+
+    if [[ "$POSTGRES_USER" != 'postgres' ]]; then
+      op=CREATE
+    else
+      op=ALTER
+    fi
+
+    echo "$op USER $POSTGRES_USER WITH SUPERUSER $pass;" | su postgres -s /bin/sh -c 'postgres --single -jE'
+    echo
+
+    echo "host all all 0.0.0.0/0 $auth_method" > "$PGDATA"/pg_hba.conf
+    echo "# nope" > "$PGDATA"/pg_ident.conf
+    cat > "$PGDATA"/postgresql.conf <<EOF
+listen_addresses = '0.0.0.0'
+data_directory   = '$PGDATA'
+hba_file         = '$PGDATA/pg_hba.conf'
+ident_file       = '$PGDATA/pg_ident.conf'
+EOF
+fi
+
+exec su postgres -s /bin/sh -c 'postgres'
+sleep 300

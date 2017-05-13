@@ -1,0 +1,12 @@
+#!/bin/bash
+set -eu
+if [[ -z "${HOMEPORT_IS_RUNNING_THE_SHOW:-}" ]]; then
+  echo >&2 "this script should not be run directly; try \`homeports run vault\` instead..."
+  exit 1
+fi
+
+need_data "data" >/dev/null
+
+export DATA="$(need_data)"
+
+spruce merge --prune meta ladings.yml >&3

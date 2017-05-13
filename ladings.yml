@@ -1,0 +1,9 @@
+postgres:
+  image:      homeports/postgres
+  privileged: false
+
+  command: /u/bin/init /rc/inittab
+  ports:
+    - '5432:5432'
+  volumes:
+    - (( concat $DATA "/data:/srv/postgres/data" ))
